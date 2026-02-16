@@ -2102,6 +2102,7 @@ body {
   margin: 0;
   border: none;
   border-radius: 0;
+  box-shadow: 0 0 0 200vmax var(--room-bg, #222);
 }
 .mobile-mode .poop {
   width: 44px;
@@ -3404,6 +3405,19 @@ if (isTouchDevice) {
 const clickWord = isTouchDevice ? 'タップ' : 'クリック';
 const misclickWord = isTouchDevice ? 'ミスタップ' : 'ミスクリック';
 
+// Room background colors for mobile fill (matches each room's floor/wall midpoint)
+const ROOM_BG_COLORS = {
+  'living':    '#c9a96e',
+  'kitchen':   '#d4c8b0',
+  'bedroom':   '#c0b0a0',
+  'garden':    '#5a9a4a',
+  'shimasa':   '#7a9b5f',
+  'eiko-room': '#3d2f2f'
+};
+function updateRoomBg(room) {
+  container.style.setProperty('--room-bg', ROOM_BG_COLORS[room] || '#222');
+}
+
 // Initialize poop arrays
 ROOMS.forEach(r => state.poops[r] = []);
 
@@ -3446,6 +3460,7 @@ function showTitle() {
   document.querySelectorAll('.pee-puddle').forEach(e => e.remove());
   document.querySelectorAll('.misclick-flash').forEach(e => e.remove());
   document.getElementById('cage-hint').style.display = 'none';
+  updateRoomBg('');
   // Reset state
   state.currentStage = 0;
   state.totalScore = 0;
@@ -3521,6 +3536,7 @@ function startStage(stageIdx) {
   state.currentRoom = cfg.room;
   state.tomRoom = cfg.room;
   state.yokoRoom = cfg.room;
+  updateRoomBg(cfg.room);
   state.deodorantUsed = false;
   state.deodorantDebuff = false;
   state.timerFrozen = false;
@@ -4572,6 +4588,7 @@ function switchRoom(room) {
   ROOMS.forEach(r => {
     document.getElementById('room-' + r).classList.toggle('active', r === room);
   });
+  updateRoomBg(room);
 }
 
 function spawnPoop() {

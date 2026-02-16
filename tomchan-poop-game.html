@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>トムちゃんのうんちゲーム</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -21,6 +21,7 @@ body {
   border: 3px solid #555;
   border-radius: 8px;
   overflow: hidden;
+  touch-action: manipulation;
 }
 
 /* HUD */
@@ -1543,6 +1544,7 @@ body {
   z-index: 200;
   color: #f0ece4;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 18px 0;
 }
 .shop-title {
@@ -2048,6 +2050,100 @@ body {
   0% { background: rgba(20,10,5,0.95); }
   100% { background: rgba(40,15,8,0.95); }
 }
+
+/* ===== Mobile / Responsive Support ===== */
+#game-wrapper {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+@media (max-width: 820px), (max-height: 640px) {
+  body {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+  }
+  #game-container {
+    margin: 0;
+    border: none;
+    transform-origin: center center;
+  }
+  /* Larger tap targets for poop */
+  .poop {
+    width: 44px;
+    height: 46px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* Larger room tabs */
+  .room-tab {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  #room-tabs {
+    height: 52px;
+    gap: 5px;
+  }
+  /* Larger HUD */
+  #hud {
+    height: 48px;
+    font-size: 14px;
+    padding: 0 10px;
+  }
+  /* Larger active item buttons */
+  .active-item-btn {
+    padding: 6px 12px;
+    font-size: 15px;
+  }
+  /* Shop adjustments */
+  .shop-items {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .shop-item-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  .shop-next-btn {
+    padding: 14px 36px;
+    font-size: 18px;
+  }
+  .btn {
+    padding: 16px 44px;
+    font-size: 22px;
+  }
+  /* Mess elements larger for touch */
+  .mess {
+    font-size: 32px !important;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Touch device: remove hover effects that cause sticky states */
+@media (hover: none) {
+  .poop:hover {
+    transform: none;
+    filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.35));
+  }
+  .room-tab:hover {
+    background: rgba(70,60,45,0.7);
+  }
+  .shop-item:hover {
+    border-color: rgba(120,100,70,0.5);
+  }
+  .equip-slot.filled:hover {
+    border-color: #5a9a5a;
+    background: rgba(50,60,40,0.8);
+  }
+  .equip-slot.filled:hover .equip-slot-remove { display: none; }
+  .equip-slot.filled:hover .equip-slot-name { display: block; }
+}
 </style>
 </head>
 <body>
@@ -2360,6 +2456,7 @@ body {
   </defs>
 </svg>
 
+<div id="game-wrapper">
 <div id="game-container">
   <!-- HUD -->
   <div id="hud" style="display:none;">
@@ -2466,6 +2563,7 @@ body {
   <!-- Stage Indicator -->
   <div id="stage-indicator" style="display:none;"></div>
 </div>
+</div><!-- /game-wrapper -->
 
 <script>
 // Sound effects using Web Audio API
@@ -3173,6 +3271,88 @@ const tomEl = document.getElementById('tom');
 const eikoEl = document.getElementById('eiko');
 const yokoEl = document.getElementById('yoko');
 
+// ===== Mobile Scaling =====
+let gameScale = 1;
+function resizeGame() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const scaleX = vw / 800;
+  const scaleY = vh / 600;
+  gameScale = Math.min(scaleX, scaleY, 1); // never scale up beyond 1
+  container.style.transform = 'scale(' + gameScale + ')';
+  container.style.transformOrigin = 'center center';
+}
+resizeGame();
+window.addEventListener('resize', resizeGame);
+window.addEventListener('orientationchange', () => { setTimeout(resizeGame, 200); });
+
+// Convert touch/mouse event coordinates to game container coordinates (accounting for scale)
+function getGameCoords(e) {
+  const rect = container.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: (clientX - rect.left) / gameScale,
+    y: (clientY - rect.top) / gameScale
+  };
+}
+
+// Prevent unwanted touch behaviors (scrolling, zooming) on the game container
+// But allow scrolling inside the shop screen
+container.addEventListener('touchmove', function(e) {
+  if (e.target.closest('#shop-screen')) return; // allow shop scrolling
+  e.preventDefault();
+}, { passive: false });
+document.body.addEventListener('touchmove', function(e) {
+  if (e.target.closest('#shop-screen')) return; // allow shop scrolling
+  if (e.target.closest('#game-container')) e.preventDefault();
+}, { passive: false });
+
+// Synthesize click from touchend for faster response on mobile
+// This eliminates the ~300ms click delay on mobile browsers
+container.addEventListener('touchstart', function(e) {
+  // Allow normal behavior for shop, buttons, and screen overlays with buttons
+  if (e.target.closest('#shop-screen')) return;
+  if (e.target.closest('.screen-overlay button')) return;
+  if (e.target.closest('[onclick]')) return;
+  // Mark touch start position for movement detection
+  this._touchStartX = e.touches[0].clientX;
+  this._touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+container.addEventListener('touchend', function(e) {
+  // Let the shop screen and overlay buttons work normally
+  if (e.target.closest('#shop-screen')) return;
+  if (e.target.closest('.screen-overlay button')) return;
+  if (e.target.closest('[onclick]')) return;
+  // Only synthesize click if the touch didn't move much (not a scroll/swipe)
+  const touch = e.changedTouches[0];
+  const dx = Math.abs(touch.clientX - (this._touchStartX || 0));
+  const dy = Math.abs(touch.clientY - (this._touchStartY || 0));
+  if (dx > 15 || dy > 15) return; // was a swipe, not a tap
+  e.preventDefault();
+  const clickEvt = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  e.target.dispatchEvent(clickEvt);
+}, { passive: false });
+
+// Detect touch device and update UI text
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+const clickWord = isTouchDevice ? 'タップ' : 'クリック';
+const misclickWord = isTouchDevice ? 'ミスタップ' : 'ミスクリック';
+if (isTouchDevice) {
+  // Update title screen text
+  const subtitle = document.querySelector('#title-screen .subtitle');
+  if (subtitle) subtitle.innerHTML = subtitle.innerHTML.replace(/クリック/g, 'タップ');
+  // Update cage hint text
+  const cageHint = document.getElementById('cage-hint');
+  if (cageHint) cageHint.innerHTML = cageHint.innerHTML.replace(/クリック/g, 'タップ');
+}
+
 // Initialize poop arrays
 ROOMS.forEach(r => state.poops[r] = []);
 
@@ -3578,7 +3758,7 @@ function startStage(stageIdx) {
   if (state.equippedItems.includes('total_control') && !state.totalControlUsed) activeHints.push('🎯制圧');
   if (activeHints.length > 0) {
     setTimeout(() => {
-      if (state.running) showStageIndicator('アクティブアイテム: ' + activeHints.join(' ') + ' (選択→クリックで発動)');
+      if (state.running) showStageIndicator('アクティブアイテム: ' + activeHints.join(' ') + ' (選択→' + clickWord + 'で発動)');
     }, 3000);
   }
 }
@@ -3647,7 +3827,7 @@ function showStageBanner(stageIdx) {
   if (cfg.mechanic === 'slippery') mechanicText = '<br><span style="font-size:18px;color:#aadaff;">⚠ 床が滑る！</span>';
   if (cfg.mechanic === 'pee_puddle') mechanicText = '<br><span style="font-size:18px;color:#ffdd66;">⚠ おしっこ水たまりに注意！</span>';
   if (cfg.mechanic === 'hidden_poop') mechanicText = '<br><span style="font-size:18px;color:#c0a0ff;">⚠ うんちが隠れている！</span>';
-  if (cfg.mechanic === 'misclick_penalty') mechanicText = '<br><span style="font-size:18px;color:#ff8888;">⚠ ミスクリック厳禁＋トラップ注意！</span>';
+  if (cfg.mechanic === 'misclick_penalty') mechanicText = '<br><span style="font-size:18px;color:#ff8888;">⚠ ' + misclickWord + '厳禁＋トラップ注意！</span>';
   banner.innerHTML = '<span class="stage-num">Stage ' + (stageIdx + 1) + '</span><br>' + cfg.name + mechanicText;
   container.appendChild(banner);
   setTimeout(() => banner.remove(), 3500);
@@ -3677,7 +3857,7 @@ function updateActiveItemsDisplay() {
       btn.className = 'active-item-btn' + (used ? ' cooldown' : '') + (isSelected ? ' selected' : '');
       btn.disabled = used;
       btn.textContent = item.icon + ' [' + (slotIdx + 1) + ']';
-      btn.title = item.name + (used ? ' (使用済)' : isSelected ? ' (選択中 - クリックで発動)' : ' (選択してからクリック)');
+      btn.title = item.name + (used ? ' (使用済)' : isSelected ? ' (選択中 - ' + clickWord + 'で発動)' : ' (選択してから' + clickWord + ')');
       btn.addEventListener('click', (ev) => {
         ev.stopPropagation();
         if (used) return;
@@ -3704,7 +3884,7 @@ function toggleActiveItem(itemId) {
     state.selectedActiveItem = itemId;
     container.classList.add('item-selected');
     const item = findItem(itemId);
-    if (item) showStageIndicator(item.icon + ' ' + item.name + ' 選択中 — クリックで発動！');
+    if (item) showStageIndicator(item.icon + ' ' + item.name + ' 選択中 — ' + clickWord + 'で発動！');
   }
   updateActiveItemsDisplay();
 }
@@ -4131,9 +4311,9 @@ container.addEventListener('click', (e) => {
 
   // Awakened mode: area-of-effect poop collection on any click
   if (state.eikoAwakened && !clickedPoop) {
-    const rect = container.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const coords = getGameCoords(e);
+    const clickX = coords.x;
+    const clickY = coords.y;
     const range = 70;
     const room = state.currentRoom;
     const toClean = [];
@@ -4154,16 +4334,16 @@ container.addEventListener('click', (e) => {
   // Misclick penalty (eiko room mechanic) - spawns 2 poops
   const currentCfg = STAGES[state.currentStage];
   if (currentCfg.mechanic === 'misclick_penalty') {
-    const rect = container.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    const coords = getGameCoords(e);
+    const mx = coords.x;
+    const my = coords.y;
     const flash = document.createElement('div');
     flash.className = 'misclick-flash';
     container.appendChild(flash);
     setTimeout(() => flash.remove(), 350);
     spawnPoopAt(mx, my);
     spawnPoopAt(mx + (-30 + Math.random() * 60), my + (-30 + Math.random() * 60));
-    showStageIndicator('ミスクリック！うんち2個追加！');
+    showStageIndicator(misclickWord + '！うんち2個追加！');
   }
 });
 
@@ -4205,8 +4385,8 @@ function spawnTrash() {
   if (trashCan) {
     canRect = trashCan.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
-    canX = canRect.left - containerRect.left + canRect.width / 2;
-    canY = canRect.top - containerRect.top + canRect.height / 2;
+    canX = (canRect.left - containerRect.left) / gameScale + canRect.width / (2 * gameScale);
+    canY = (canRect.top - containerRect.top) / gameScale + canRect.height / (2 * gameScale);
     // Shake the trash can
     trashCan.classList.remove('shaking');
     void trashCan.offsetWidth;
@@ -5331,7 +5511,7 @@ function showShop(stageScore, timeBonus, rankInfo) {
   if (nextStage.mechanic === 'slippery') mechanicHint = ' ⚠床が滑る';
   if (nextStage.mechanic === 'pee_puddle') mechanicHint = ' ⚠おしっこ水たまり';
   if (nextStage.mechanic === 'hidden_poop') mechanicHint = ' ⚠うんちが隠れている';
-  if (nextStage.mechanic === 'misclick_penalty') mechanicHint = ' ⚠ミスクリック＋トラップ';
+  if (nextStage.mechanic === 'misclick_penalty') mechanicHint = ' ⚠' + misclickWord + '＋トラップ';
   html += '<div class="shop-stage-info">次: Stage ' + (state.currentStage + 2) + ' 「' + nextStage.name + '」' + mechanicHint + '</div>';
 
   // Equipment slots display

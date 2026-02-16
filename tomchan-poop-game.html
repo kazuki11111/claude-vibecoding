@@ -2052,24 +2052,14 @@ body {
 }
 
 /* ===== Mobile / Responsive Support ===== */
-#game-wrapper {
-  width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: #222;
-}
 
-/* Portrait orientation overlay */
+/* Portrait orientation overlay (controlled by JS) */
 #rotate-hint {
   display: none;
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0; left: 0; width: 100%; height: 100%;
   background: rgba(15,12,10,0.95);
-  z-index: 9999;
+  z-index: 99999;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -2078,6 +2068,7 @@ body {
   text-align: center;
   gap: 16px;
 }
+#rotate-hint.visible { display: flex; }
 #rotate-hint .rotate-icon {
   font-size: 64px;
   animation: rotatePhone 2s ease-in-out infinite;
@@ -2095,77 +2086,66 @@ body {
   font-size: 14px;
   color: #9a9088;
 }
-@media (max-width: 820px) and (orientation: portrait) {
-  #rotate-hint { display: flex; }
-}
 
-@media (max-width: 820px), (max-height: 640px) {
-  body {
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
-    height: 100%;
-    height: 100dvh;
-  }
-  #game-wrapper {
-    height: 100%;
-    height: 100dvh;
-  }
-  #game-container {
-    margin: 0;
-    border: none;
-    transform-origin: center center;
-  }
-  /* Larger tap targets for poop */
-  .poop {
-    width: 44px;
-    height: 46px;
-    min-width: 44px;
-    min-height: 44px;
-  }
-  /* Larger room tabs */
-  .room-tab {
-    padding: 10px 14px;
-    font-size: 13px;
-  }
-  #room-tabs {
-    height: 52px;
-    gap: 5px;
-  }
-  /* Larger HUD */
-  #hud {
-    height: 48px;
-    font-size: 14px;
-    padding: 0 10px;
-  }
-  /* Larger active item buttons */
-  .active-item-btn {
-    padding: 6px 12px;
-    font-size: 15px;
-  }
-  /* Shop adjustments */
-  .shop-items {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-  .shop-item-btn {
-    padding: 8px 16px;
-    font-size: 13px;
-  }
-  .shop-next-btn {
-    padding: 14px 36px;
-    font-size: 18px;
-  }
-  .btn {
-    padding: 16px 44px;
-    font-size: 22px;
-  }
-  /* Mess elements larger for touch */
-  .mess {
-    font-size: 32px !important;
-    min-width: 44px;
-    min-height: 44px;
-  }
+/* Mobile styles */
+.mobile-mode body,
+.mobile-mode {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+.mobile-mode #game-container {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+.mobile-mode .poop {
+  width: 44px;
+  height: 46px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.mobile-mode .room-tab {
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.mobile-mode #room-tabs {
+  height: 52px;
+  gap: 5px;
+}
+.mobile-mode #hud {
+  height: 48px;
+  font-size: 14px;
+  padding: 0 10px;
+}
+.mobile-mode .active-item-btn {
+  padding: 6px 12px;
+  font-size: 15px;
+}
+.mobile-mode .shop-items {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.mobile-mode .shop-item-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+.mobile-mode .shop-next-btn {
+  padding: 14px 36px;
+  font-size: 18px;
+}
+.mobile-mode .btn {
+  padding: 16px 44px;
+  font-size: 22px;
+}
+.mobile-mode .mess {
+  font-size: 32px !important;
+  min-width: 44px;
+  min-height: 44px;
 }
 
 /* Touch device: remove hover effects that cause sticky states */
@@ -2506,7 +2486,6 @@ body {
   </defs>
 </svg>
 
-<div id="game-wrapper">
 <div id="game-container">
   <!-- HUD -->
   <div id="hud" style="display:none;">
@@ -2613,7 +2592,6 @@ body {
   <!-- Stage Indicator -->
   <div id="stage-indicator" style="display:none;"></div>
 </div>
-</div><!-- /game-wrapper -->
 
 <script>
 // Sound effects using Web Audio API
@@ -3321,20 +3299,52 @@ const tomEl = document.getElementById('tom');
 const eikoEl = document.getElementById('eiko');
 const yokoEl = document.getElementById('yoko');
 
-// ===== Mobile Scaling =====
+// ===== Mobile Detection & Scaling =====
 let gameScale = 1;
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+const rotateHint = document.getElementById('rotate-hint');
+
+// Apply mobile class for CSS
+if (isMobile || (isTouchDevice && window.innerWidth <= 820)) {
+  document.documentElement.classList.add('mobile-mode');
+}
+
 function resizeGame() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const scaleX = vw / 800;
   const scaleY = vh / 600;
-  gameScale = Math.min(scaleX, scaleY); // scale to fit viewport
-  container.style.transform = 'scale(' + gameScale + ')';
-  container.style.transformOrigin = 'center center';
+  gameScale = Math.min(scaleX, scaleY);
+
+  if (document.documentElement.classList.contains('mobile-mode')) {
+    // Mobile: position: fixed + translate for pixel-perfect centering
+    container.style.position = 'fixed';
+    container.style.left = '50%';
+    container.style.top = '50%';
+    container.style.transform = 'translate(-50%, -50%) scale(' + gameScale + ')';
+    container.style.transformOrigin = 'center center';
+  } else {
+    // Desktop: just scale in place
+    container.style.transform = gameScale < 1 ? 'scale(' + gameScale + ')' : '';
+    container.style.transformOrigin = 'center center';
+  }
+
+  // Rotate hint: show in portrait on mobile
+  if (rotateHint && isMobile) {
+    if (vw < vh) {
+      rotateHint.classList.add('visible');
+    } else {
+      rotateHint.classList.remove('visible');
+    }
+  }
 }
 resizeGame();
 window.addEventListener('resize', resizeGame);
-window.addEventListener('orientationchange', () => { setTimeout(resizeGame, 200); });
+window.addEventListener('orientationchange', function() {
+  setTimeout(resizeGame, 100);
+  setTimeout(resizeGame, 300);
+});
 
 // Convert touch/mouse event coordinates to game container coordinates (accounting for scale)
 function getGameCoords(e) {
@@ -3347,61 +3357,52 @@ function getGameCoords(e) {
   };
 }
 
-// Prevent unwanted touch behaviors (scrolling, zooming) on the game container
-// But allow scrolling inside the shop screen
-container.addEventListener('touchmove', function(e) {
-  if (e.target.closest('#shop-screen')) return; // allow shop scrolling
-  e.preventDefault();
-}, { passive: false });
-document.body.addEventListener('touchmove', function(e) {
-  if (e.target.closest('#shop-screen')) return; // allow shop scrolling
-  if (e.target.closest('#game-container')) e.preventDefault();
-}, { passive: false });
-
-// Synthesize click from touchend for faster response on mobile
-// This eliminates the ~300ms click delay on mobile browsers
-container.addEventListener('touchstart', function(e) {
-  // Allow normal behavior for shop, buttons, and screen overlays with buttons
-  if (e.target.closest('#shop-screen')) return;
-  if (e.target.closest('.screen-overlay button')) return;
-  if (e.target.closest('[onclick]')) return;
-  // Mark touch start position for movement detection
-  this._touchStartX = e.touches[0].clientX;
-  this._touchStartY = e.touches[0].clientY;
-}, { passive: true });
-
-container.addEventListener('touchend', function(e) {
-  // Let the shop screen and overlay buttons work normally
-  if (e.target.closest('#shop-screen')) return;
-  if (e.target.closest('.screen-overlay button')) return;
-  if (e.target.closest('[onclick]')) return;
-  // Only synthesize click if the touch didn't move much (not a scroll/swipe)
-  const touch = e.changedTouches[0];
-  const dx = Math.abs(touch.clientX - (this._touchStartX || 0));
-  const dy = Math.abs(touch.clientY - (this._touchStartY || 0));
-  if (dx > 15 || dy > 15) return; // was a swipe, not a tap
-  e.preventDefault();
-  const clickEvt = new MouseEvent('click', {
-    bubbles: true,
-    cancelable: true,
-    clientX: touch.clientX,
-    clientY: touch.clientY
-  });
-  e.target.dispatchEvent(clickEvt);
-}, { passive: false });
-
-// Detect touch device and update UI text
-const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-const clickWord = isTouchDevice ? 'タップ' : 'クリック';
-const misclickWord = isTouchDevice ? 'ミスタップ' : 'ミスクリック';
+// ===== Touch Event Support =====
 if (isTouchDevice) {
-  // Update title screen text
-  const subtitle = document.querySelector('#title-screen .subtitle');
+  // Prevent unwanted scrolling/zooming on the game container (allow shop scrolling)
+  container.addEventListener('touchmove', function(e) {
+    if (e.target.closest('#shop-screen')) return;
+    e.preventDefault();
+  }, { passive: false });
+  document.body.addEventListener('touchmove', function(e) {
+    if (e.target.closest('#shop-screen')) return;
+    if (e.target.closest('#game-container')) e.preventDefault();
+  }, { passive: false });
+
+  // Synthesize click from touch for faster response (eliminates ~300ms delay)
+  container.addEventListener('touchstart', function(e) {
+    if (e.target.closest('#shop-screen')) return;
+    if (e.target.closest('.screen-overlay button')) return;
+    if (e.target.closest('[onclick]')) return;
+    this._touchStartX = e.touches[0].clientX;
+    this._touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  container.addEventListener('touchend', function(e) {
+    if (e.target.closest('#shop-screen')) return;
+    if (e.target.closest('.screen-overlay button')) return;
+    if (e.target.closest('[onclick]')) return;
+    var touch = e.changedTouches[0];
+    var dx = Math.abs(touch.clientX - (this._touchStartX || 0));
+    var dy = Math.abs(touch.clientY - (this._touchStartY || 0));
+    if (dx > 15 || dy > 15) return;
+    e.preventDefault();
+    var clickEvt = new MouseEvent('click', {
+      bubbles: true, cancelable: true,
+      clientX: touch.clientX, clientY: touch.clientY
+    });
+    e.target.dispatchEvent(clickEvt);
+  }, { passive: false });
+
+  // Update UI text: クリック → タップ
+  var subtitle = document.querySelector('#title-screen .subtitle');
   if (subtitle) subtitle.innerHTML = subtitle.innerHTML.replace(/クリック/g, 'タップ');
-  // Update cage hint text
-  const cageHint = document.getElementById('cage-hint');
+  var cageHint = document.getElementById('cage-hint');
   if (cageHint) cageHint.innerHTML = cageHint.innerHTML.replace(/クリック/g, 'タップ');
 }
+
+const clickWord = isTouchDevice ? 'タップ' : 'クリック';
+const misclickWord = isTouchDevice ? 'ミスタップ' : 'ミスクリック';
 
 // Initialize poop arrays
 ROOMS.forEach(r => state.poops[r] = []);
